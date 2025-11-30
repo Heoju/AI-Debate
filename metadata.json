@@ -1,5 +1,5 @@
 {
-  "name": "AI 토론 위원회",
+  "name": "AI 감정본부회의",
   "description": "다양한 AI 페르소나가 주제에 대해 토론하고 결론을 도출하는 멀티 에이전트 시뮬레이션입니다.",
   "requestFramePermissions": []
 }

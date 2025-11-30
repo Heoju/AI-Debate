@@ -1,6 +1,7 @@
+
 import React from 'react';
-import { Persona, PersonaId } from '../types';
-import { Gavel, ShieldAlert, Rocket, Scale, ScrollText } from 'lucide-react';
+import { Persona } from '../types';
+import { Sun, CloudRain, Flame, OctagonX, Eye, Gavel } from 'lucide-react';
 
 interface CouncilMemberProps {
   persona: Persona;
@@ -9,11 +10,12 @@ interface CouncilMemberProps {
 }
 
 const IconMap: Record<string, React.ElementType> = {
-  'Gavel': Gavel,
-  'ShieldAlert': ShieldAlert,
-  'Rocket': Rocket,
-  'Scale': Scale,
-  'ScrollText': ScrollText
+  'Sun': Sun,
+  'CloudRain': CloudRain,
+  'Flame': Flame,
+  'OctagonX': OctagonX,
+  'Eye': Eye,
+  'Gavel': Gavel // Fallback
 };
 
 export const CouncilMember: React.FC<CouncilMemberProps> = ({ persona, isActive, isSpeaking }) => {

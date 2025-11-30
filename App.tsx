@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Message, AppStatus, PersonaId } from './types';
@@ -71,12 +72,12 @@ const App: React.FC = () => {
     setStatus(AppStatus.DEBATING);
     setMessages([]);
     
-    // Initial Moderator Intro
+    // Initial Moderator Intro (Joy starts the conversation)
     const introId = crypto.randomUUID();
     const introMsg: Message = {
       id: introId,
-      personaId: PersonaId.MODERATOR,
-      text: `지금부터 위원회를 개회합니다. 오늘의 토론 주제는 "${topic}"입니다. 위원님들께서는 각자의 견해를 말씀해 주십시오.`,
+      personaId: PersonaId.JOY, // Joy acts as moderator
+      text: `안녕 얘들아! 오늘 우리가 이야기해 볼 주제는 "${topic}"이야! 다들 어떻게 생각해? 신나게 이야기해보자!`,
       timestamp: Date.now()
     };
     setMessages([introMsg]);
@@ -134,16 +135,16 @@ const App: React.FC = () => {
   };
 
   const getNextSpeaker = (lastSpeakerId: PersonaId): PersonaId => {
-    // Simple round robin excluding Moderator for the main debate
+    // Simple round robin excluding JOY (Moderator) for the main debate
     const speakers = [
-      PersonaId.SKEPTIC, 
-      PersonaId.FUTURIST, 
-      PersonaId.ETHICIST, 
-      PersonaId.HISTORIAN
+      PersonaId.SADNESS, 
+      PersonaId.ANGER, 
+      PersonaId.DISGUST, 
+      PersonaId.FEAR
     ];
     
-    // If moderator just spoke, pick random first speaker
-    if (lastSpeakerId === PersonaId.MODERATOR) {
+    // If Joy just spoke, pick random first speaker
+    if (lastSpeakerId === PersonaId.JOY) {
         return speakers[Math.floor(Math.random() * speakers.length)];
     }
 
@@ -184,7 +185,7 @@ const App: React.FC = () => {
             setMessages(prev => [...prev, newMsg]);
             
         } else if (statusRef.current === AppStatus.CONCLUDING) {
-             setCurrentSpeakerId(PersonaId.MODERATOR);
+             setCurrentSpeakerId(PersonaId.JOY);
              // Generate conclusion
              const history = messagesRef.current;
              
@@ -194,7 +195,7 @@ const App: React.FC = () => {
              
              const finalMsg: Message = {
                  id: crypto.randomUUID(),
-                 personaId: PersonaId.MODERATOR,
+                 personaId: PersonaId.JOY,
                  text: text,
                  timestamp: Date.now()
              };
@@ -208,7 +209,7 @@ const App: React.FC = () => {
     // Only run if we are in an active state and not processing
     if (status === AppStatus.DEBATING || status === AppStatus.CONCLUDING) {
        // Only proceed if the last message wasn't the conclusion and we aren't finished
-       if (status === AppStatus.CONCLUDING && messages.length > 0 && messages[messages.length-1].personaId === PersonaId.MODERATOR && messages[messages.length-1].text.length > 50) {
+       if (status === AppStatus.CONCLUDING && messages.length > 0 && messages[messages.length-1].personaId === PersonaId.JOY && messages[messages.length-1].text.length > 20) {
            // Already concluded
            setStatus(AppStatus.FINISHED);
        } else {
@@ -225,10 +226,10 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="flex-none p-6 border-b border-gray-800 bg-gray-900/50 backdrop-blur-md z-10 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            AI 토론 위원회
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-blue-500 bg-clip-text text-transparent">
+            감정 본부 회의
           </h1>
-          <p className="text-xs text-gray-500">자율 토론 시뮬레이션</p>
+          <p className="text-xs text-gray-500">Inside Out 감정 토론 시뮬레이션</p>
         </div>
         <div className="flex items-center gap-3">
             <button 
@@ -238,9 +239,6 @@ const App: React.FC = () => {
             >
                 <Settings size={20} />
             </button>
-            <div className="text-xs font-mono text-gray-600 border border-gray-800 rounded px-2 py-1 hidden md:block">
-              v1.2.0 (KO)
-            </div>
         </div>
       </header>
 
@@ -251,7 +249,7 @@ const App: React.FC = () => {
              <CouncilMember 
                 key={p.id} 
                 persona={p} 
-                isActive={currentSpeakerId === p.id || (p.id === PersonaId.MODERATOR && status === AppStatus.CONCLUDING)}
+                isActive={currentSpeakerId === p.id || (p.id === PersonaId.JOY && status === AppStatus.CONCLUDING)}
                 isSpeaking={currentSpeakerId === p.id}
              />
           ))}
@@ -276,7 +274,7 @@ const App: React.FC = () => {
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
                     disabled={status !== AppStatus.IDLE}
-                    placeholder={status === AppStatus.IDLE ? "토론 주제를 입력하세요..." : "토론 진행 중..."}
+                    placeholder={status === AppStatus.IDLE ? "라일리가 고민 중인 주제는?" : "감정들이 의논 중..."}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg py-3 pl-4 pr-12 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
@@ -291,10 +289,10 @@ const App: React.FC = () => {
                         <button 
                             onClick={handleStart}
                             disabled={!topic.trim()}
-                            className="flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-500 text-white font-semibold rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                            className="flex items-center gap-2 px-6 py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
                         >
                             <Play size={18} fill="currentColor" />
-                            시작
+                            회의 시작
                         </button>
                         {status === AppStatus.FINISHED && (
                              <button 
@@ -311,7 +309,7 @@ const App: React.FC = () => {
                          {status === AppStatus.DEBATING && (
                             <button 
                                 onClick={handleConclude}
-                                className="flex items-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all"
+                                className="flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg shadow-lg transition-all"
                             >
                                 <Gavel size={18} />
                                 결론 도출

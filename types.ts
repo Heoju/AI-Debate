@@ -1,9 +1,10 @@
+
 export enum PersonaId {
-  MODERATOR = 'MODERATOR',
-  SKEPTIC = 'SKEPTIC',
-  FUTURIST = 'FUTURIST',
-  ETHICIST = 'ETHICIST',
-  HISTORIAN = 'HISTORIAN',
+  JOY = 'JOY',         // 기쁨이 (사회자 역할)
+  SADNESS = 'SADNESS', // 슬픔이
+  ANGER = 'ANGER',     // 버럭이
+  DISGUST = 'DISGUST', // 까칠이
+  FEAR = 'FEAR',       // 소심이
 }
 
 export interface Persona {

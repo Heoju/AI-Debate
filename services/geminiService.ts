@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Message, Persona, PersonaId } from "../types";
 import { PERSONAS } from "../constants";
@@ -13,6 +14,22 @@ const getClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
+// Helper to extract text safely even if stopped by MAX_TOKENS
+const extractResponseText = (response: any): string | null => {
+  // 1. Try standard getter
+  if (response.text) {
+    return response.text;
+  }
+  // 2. Deep dive for partial content (if getter fails due to finishReason)
+  if (response.candidates && response.candidates.length > 0) {
+    const candidate = response.candidates[0];
+    if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+        return candidate.content.parts.map((p: any) => p.text).join('');
+    }
+  }
+  return null;
+};
+
 export const generatePersonaResponse = async (
   topic: string,
   history: Message[],
@@ -23,24 +40,32 @@ export const generatePersonaResponse = async (
   
     // Use systemInstruction to strictly define the persona
     const systemInstruction = `
-      당신은 'AI 토론 위원회'의 일원인 ${targetPersona.name}입니다.
+      당신은 애니메이션 '인사이드 아웃'의 감정 캐릭터 중 하나인 '${targetPersona.name}'입니다.
 
       [페르소나 정의]
       이름: ${targetPersona.name}
       역할: ${targetPersona.role}
-      성격/설명: ${targetPersona.description}
+      성격: ${targetPersona.description}
 
-      [행동 지침]
-      1. 위 페르소나의 성격, 어조, 관점을 완벽하게 체화하여 연기하십시오.
-      2. 절대 AI임을 드러내지 말고, 주어진 역할로서만 발언하십시오.
-      3. 토론 주제와 이전 발언들을 맥락으로 고려하여 논리적이고 독창적인 의견을 제시하십시오.
-      4. 한국어로 자연스럽게 말하십시오.
-      5. 발언은 3~5문장 내외(약 150자)로 간결하게 핵심을 찌르십시오.
-      6. 답변 시작 시 자신의 이름을 말하지 마십시오.
+      [필수 행동 지침]
+      1. 위 캐릭터의 말투, 감정 상태, 억양을 완벽하게 연기하십시오.
+      2. 예시:
+         - 기쁨이: 밝고 명랑하게! 느낌표(!)를 자주 사용. "와! 정말 좋은 생각이야!"
+         - 슬픔이: 힘없고 축 처지게... 말끝을 흐림... "너무 슬퍼..."
+         - 버럭이: 화를 내며 강하게!! "말도 안 되는 소리!!"
+         - 까칠이: 도도하고 비꼬듯이. "흥, 그게 최선이니?"
+         - 소심이: 떨면서 걱정스럽게... "위험해! 안 돼!"
+      3. 절대 AI임을 드러내지 마십시오.
+      4. 답변은 **반드시 2~3문장, 최대 4줄 이내**로 짧게 하십시오. 길게 말하지 마십시오.
+      5. 주제에 대해 캐릭터의 관점으로만 이야기하십시오.
+      6. 자신의 이름을 말하며 시작하지 마십시오.
     `;
 
+    // Filter out system error messages from history to prevent "garbage in, garbage out"
+    const validHistory = history.filter(m => !m.text.startsWith('(') && !m.text.startsWith('['));
+
     // Format the conversation history for context
-    const transcript = history.map(m => {
+    const transcript = validHistory.map(m => {
       const p = PERSONAS[m.personaId];
       return `${p.name}: ${m.text}`;
     }).join("\n");
@@ -49,11 +74,11 @@ export const generatePersonaResponse = async (
       [현재 토론 주제]
       "${topic}"
 
-      [지금까지의 토론 기록]
+      [지금까지의 대화]
       ${transcript.length > 0 ? transcript : "(아직 발언 없음)"}
 
       [요청]
-      위 맥락을 바탕으로 ${targetPersona.name}로서 다음 발언을 하십시오.
+      위 상황에서 ${targetPersona.name}의 감정을 담아 2~3줄로 짧게 대꾸하십시오.
     `;
 
     const response = await ai.models.generateContent({
@@ -61,8 +86,8 @@ export const generatePersonaResponse = async (
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         systemInstruction: systemInstruction,
-        temperature: 0.8, // Slightly higher creativity for distinct personalities
-        maxOutputTokens: 500,
+        temperature: 0.9, // High creativity for emotional expression
+        maxOutputTokens: 2000, 
         safetySettings: [
           { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
           { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
@@ -72,11 +97,16 @@ export const generatePersonaResponse = async (
       }
     });
 
-    if (response.text) {
-        return response.text.trim();
+    const text = extractResponseText(response);
+
+    if (text) {
+        if (response.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
+            return text.trim() + " ...";
+        }
+        return text.trim();
     }
     
-    // Fallback if text is missing but we have a finish reason (e.g. Safety)
+    // Fallback if absolutely NO text is found
     if (response.candidates && response.candidates.length > 0) {
         const candidate = response.candidates[0];
         if (candidate.finishReason) {
@@ -88,7 +118,6 @@ export const generatePersonaResponse = async (
     throw new Error("No text returned from Gemini");
   } catch (error: any) {
     console.error("Gemini Persona Error:", error);
-    // Return a user-friendly error message in the transcript
     if (error.message.includes("API Key")) {
         return "(시스템 오류: API Key가 설정되지 않았습니다. 우측 상단 설정 버튼을 눌러 키를 입력해주세요.)";
     }
@@ -104,32 +133,34 @@ export const generateConclusion = async (
     const ai = getClient();
     
     const systemInstruction = `
-      당신은 'AI 토론 위원회'의 '의장(Moderator)'입니다.
+      당신은 '인사이드 아웃'의 리더 '기쁨이(Joy)'입니다.
       
       [임무]
-      위원들의 토론 내용을 종합하고, 중립적이고 권위 있는 최종 결론을 내리십시오.
+      친구들(슬픔, 버럭, 까칠, 소심)의 의견을 모두 듣고, 긍정적이고 희망찬 결론을 내려주세요.
       
       [지침]
-      1. 각 위원(비판론자, 미래학자 등)의 주요 입장을 요약 반영하십시오.
-      2. 주제에 대한 균형 잡힌 시각을 유지하며 미래 지향적인 판결을 내리십시오.
-      3. 정중하고 격조 높은 한국어를 사용하십시오.
-      4. 200자 내외로 명확하게 결론을 맺으십시오.
+      1. 친구들의 걱정과 화, 슬픔을 다독여주며 긍정적인 방향으로 이끄세요.
+      2. 언제나처럼 밝고 활기차게 말하세요!
+      3. 답변은 **3~4줄 이내**로 명확하게 맺으세요.
     `;
 
-    const transcript = history.map(m => {
+    // Filter out system error messages
+    const validHistory = history.filter(m => !m.text.startsWith('(') && !m.text.startsWith('['));
+
+    const transcript = validHistory.map(m => {
       const p = PERSONAS[m.personaId];
       return `${p.name} (${p.role}): ${m.text}`;
     }).join("\n");
 
     const prompt = `
-      [토론 주제]
+      [주제]
       "${topic}"
 
-      [전체 토론 내용]
+      [대화 내용]
       ${transcript}
 
       [요청]
-      의장으로서 이 토론의 최종 결론을 내리십시오.
+      기쁨이로서 모두를 아우르는 행복한 결론을 내려줘! (짧게)
     `;
 
     const response = await ai.models.generateContent({
@@ -137,7 +168,8 @@ export const generateConclusion = async (
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         systemInstruction: systemInstruction,
-        temperature: 0.6, // More stable/deterministic for conclusions
+        temperature: 0.7, 
+        maxOutputTokens: 2000,
         safetySettings: [
           { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
           { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
@@ -147,8 +179,13 @@ export const generateConclusion = async (
       }
     });
 
-    if (response.text) {
-        return response.text.trim();
+    const text = extractResponseText(response);
+
+    if (text) {
+        if (response.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
+            return text.trim() + " ...";
+        }
+        return text.trim();
     }
 
     if (response.candidates && response.candidates.length > 0) {
